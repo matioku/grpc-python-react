@@ -8,3 +8,8 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Stubs
+protos/*_pb2.py
+protos/*_pb2.pyi
+protos/*_pb2_grpc.py

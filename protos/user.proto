@@ -9,11 +9,19 @@ message GetUserRequest {                  // Ce que le client ENVOIE
 }                                         // pas une valeur ! Il identifie le champ dans le
                                           // format binaire et ne doit JAMAIS changer une fois publié.
 
+message Address {                         // Message imbriqué : un type composite réutilisable
+  string street = 1;                      // Rue
+  string city = 2;                        // Ville
+}
+
 message User {                            // Ce que le serveur RÉPOND
   int32 id = 1;                           // Identifiant de l'utilisateur
   string name = 2;                        // Nom (chaîne UTF-8)
   string email = 3;                        // Adresse e-mail
-}
+  string nickname = 4;                    // Surnom. Nouveau numéro = 4 : on n'a RIEN réutilisé,
+                                          // les numéros 1-3 restent intacts → rétrocompatible.
+  Address address = 5;                    // Champ de type message. En proto3 un sous-message est
+}                                         // toujours "optionnel" : absent = message vide, pas null.
 
 message GetUserResponse {                 // Enveloppe de réponse (bonne pratique : pouvoir
   User user = 1;                          // ajouter des champs plus tard sans casser le contrat)
