@@ -1,0 +1,32 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "proto": "protoc -I ../protos --js_out=import_style=commonjs,binary:src/generated --grpc-web_out=import_style=typescript,mode=grpcwebtext:src/generated ../protos/chat.proto",
+    "predev": "npm run proto",
+    "dev": "vite",
+    "prebuild": "npm run proto",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "generated": "file:src/generated",
+    "google-protobuf": "^4.0.3",
+    "grpc-web": "^2.1.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/google-protobuf": "^3.15.12",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "oxlint": "^1.81.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0"
+  }
+}

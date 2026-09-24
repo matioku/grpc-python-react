@@ -1,0 +1,12 @@
+{
+  "name": "generated",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Stubs grpc-web générés depuis protos/chat.proto (npm run proto) — ne pas éditer à la main.",
+  "type": "commonjs",
+  "main": "chat_pb.js",
+  "peerDependencies": {
+    "google-protobuf": "*",
+    "grpc-web": "*"
+  }
+}

@@ -1,0 +1,79 @@
+# Proxy Envoy (Module 3.4) — traduit grpc-web (navigateur) → gRPC natif (Python)
+#
+#   React :5173 ──HTTP/1.1 grpc-web──▶ Envoy :8080 ──HTTP/2 gRPC──▶ main.py :50051
+#
+# Lancement :
+#   docker run --rm -it -v "$(pwd)/envoy.yaml:/etc/envoy/envoy.yaml:ro" \
+#     -p 8080:8080 -p 9901:9901 envoyproxy/envoy:v1.39-latest
+
+admin:
+  address:
+    socket_address: { address: 0.0.0.0, port_value: 9901 }   # console d'admin (http://localhost:9901)
+
+static_resources:
+  listeners:
+  # ---------- 1. LISTENER : là où React envoie ses requêtes grpc-web ----------
+  - name: listener_0
+    address:
+      socket_address: { address: 0.0.0.0, port_value: 8080 }  # ← le front appelle ce port
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          codec_type: auto
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains: ["*"]
+              routes:
+              - match: { prefix: "/" }                          # toutes les requêtes…
+                route:
+                  cluster: chat_service                          # … envoyées au cluster Python
+                  timeout: 0s                                    # pas de timeout (sinon 15 s coupent les streams)
+                  max_stream_duration: { grpc_timeout_header_max: 0s }
+              # CORS : le front (localhost:5173) et Envoy (localhost:8080) n'ont pas
+              # la même origine → le navigateur envoie un preflight OPTIONS.
+              typed_per_filter_config:
+                envoy.filters.http.cors:
+                  "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
+                  allow_origin_string_match:
+                  - prefix: "*"
+                  allow_methods: GET, PUT, DELETE, POST, OPTIONS
+                  allow_headers: keep-alive,user-agent,cache-control,content-type,content-transfer-encoding,x-accept-content-transfer-encoding,x-accept-response-streaming,x-user-agent,x-grpc-web,grpc-timeout
+                  expose_headers: grpc-status,grpc-message       # le front doit pouvoir lire le statut gRPC
+                  max_age: "1728000"
+          # ---------- 2. HTTP_FILTERS : la traduction ----------
+          http_filters:
+          - name: envoy.filters.http.grpc_web                  # ← LE filtre traducteur grpc-web ⇄ gRPC
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_web.v3.GrpcWeb
+          - name: envoy.filters.http.cors
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
+          - name: envoy.filters.http.router                    # toujours en dernier
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  # ---------- 3. CLUSTER : la destination = le serveur Python (main.py) ----------
+  clusters:
+  - name: chat_service
+    type: LOGICAL_DNS                    # un nom d'hôte (pas une IP) → résolution DNS
+    dns_lookup_family: V4_ONLY
+    connect_timeout: 0.25s
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}     # le backend parle HTTP/2 (gRPC natif)
+    load_assignment:
+      cluster_name: chat_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              # host.docker.internal = la machine hôte vue depuis le conteneur (Mac/Windows).
+              # Linux : ajouter --add-host=host.docker.internal:host-gateway au docker run.
+              socket_address: { address: host.docker.internal, port_value: 50051 }
