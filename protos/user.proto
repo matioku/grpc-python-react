@@ -1,0 +1,28 @@
+syntax = "proto3";                        // Version du langage protobuf (proto3 = la plus courante)
+
+package user.v1;                          // Namespace : évite les collisions de noms entre fichiers .proto
+
+// ---------- LES MESSAGES : la structure des données ----------
+
+message GetUserRequest {                  // Ce que le client ENVOIE
+  int32 user_id = 1;                      // Champ typé. Le "= 1" est un NUMÉRO de champ,
+}                                         // pas une valeur ! Il identifie le champ dans le
+                                          // format binaire et ne doit JAMAIS changer une fois publié.
+
+message User {                            // Ce que le serveur RÉPOND
+  int32 id = 1;                           // Identifiant de l'utilisateur
+  string name = 2;                        // Nom (chaîne UTF-8)
+  string email = 3;                        // Adresse e-mail
+}
+
+message GetUserResponse {                 // Enveloppe de réponse (bonne pratique : pouvoir
+  User user = 1;                          // ajouter des champs plus tard sans casser le contrat)
+}
+
+// ---------- LE SERVICE : les méthodes exposées ----------
+
+service UserService {                     // Le "contrat d'API" que le serveur doit implémenter
+  rpc GetUser (GetUserRequest) returns (GetUserResponse);
+  // ↑ Un appel "unary" : 1 requête → 1 réponse, le cas le plus simple.
+  //   C'est l'équivalent d'un GET en REST, mais typé et binaire.
+}
