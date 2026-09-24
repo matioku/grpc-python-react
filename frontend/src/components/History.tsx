@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { RpcError } from "grpc-web";
 import { ChatMessage, HistoryRequest } from "generated/chat_pb";
 import { client, statusName } from "../grpc/client";
+import { callMetadata } from "../grpc/metadata";
 
 export function History() {
   const [messages, setMessages] = useState<string[]>([]);
@@ -14,7 +15,9 @@ export function History() {
     const request = new HistoryRequest().setUser("Mounir");
 
     // Le stream reste ouvert : à chaque message reçu, on ajoute à l'état React
-    const stream = client.history(request, {});
+    // 2e argument = metadata (4.5) + deadline (4.4) : un historique doit
+    // arriver vite, sinon autant prévenir l'utilisateur.
+    const stream = client.history(request, callMetadata());
     stream.on("data", (msg: ChatMessage) => {
       // Exercice 1 : on affiche aussi l'auteur (getUser())
       setMessages((prev) => [

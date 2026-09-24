@@ -43,8 +43,13 @@ service ChatService {
   // CLIENT STREAMING : envoyer un lot de messages, recevoir un résumé
   rpc UploadBatch (stream SubscribeRequest) returns (UploadSummary);
 
-  // BIDIRECTIONNEL : chat en temps réel
+  // BIDIRECTIONNEL : chat en temps réel (clients natifs : Python, Go…)
   rpc Chat (stream ChatMessage) returns (stream ChatMessage);
+
+  // SERVER STREAMING (Module 4) : flux DESCENDANT du chat pour le navigateur.
+  // grpc-web ne sait pas ouvrir de flux MONTANT : le navigateur s'abonne ici
+  // et envoie ses messages via l'unary SendMessage (voir README « Écarts »).
+  rpc Subscribe (SubscribeRequest) returns (stream ChatMessage);
 
   // Exercice 1 : supprimer un message
   rpc DeleteMessage (MessageId) returns (UploadSummary);

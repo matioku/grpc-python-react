@@ -2,11 +2,14 @@ import { useState } from "react";
 import type { RpcError } from "grpc-web";
 import { ChatMessage } from "generated/chat_pb"; // classe message générée
 import { client, statusName } from "../grpc/client"; // le stub du 3.5
+import { grpcErrorMessage } from "../grpc/errors";
+import { callMetadata } from "../grpc/metadata";
 
 export function SendMessage() {
   const [text, setText] = useState("");
   const [ack, setAck] = useState("");
   const [error, setError] = useState("");
+  const [canRetry, setCanRetry] = useState(false); // Module 4.6
 
   // L'appel unary : l'équivalent du stub.SendMessage() de Python !
   const send = async () => {
@@ -21,15 +24,20 @@ export function SendMessage() {
       .setTimestamp(new Date().toISOString());
 
     try {
-      // 2. L'appel RPC — "unary" = 1 requête, 1 réponse
-      const response = await client.sendMessage(request, {});
+      // 2. L'appel RPC — "unary" = 1 requête, 1 réponse.
+      //    2e argument = les METADATA (4.5), qui portent aussi le deadline (4.4).
+      const response = await client.sendMessage(request, callMetadata());
       // 3. On lit la réponse TYPÉE (getText() existe grâce au .proto)
       setAck(response.getText());
       setText("");
+      setCanRetry(false);
     } catch (err) {
-      // 4. Les erreurs gRPC arrivent ici — mêmes codes que Python ! (Module 2)
-      const rpcError = err as RpcError;
-      setError(`${statusName(rpcError.code)} (${rpcError.code}) : ${rpcError.message}`);
+      // 4. Module 4.6 : le code gRPC devient un message humain…
+      const { message, retryable } = grpcErrorMessage(err);
+      const code = (err as RpcError).code;
+      // … et on garde le code technique, utile pendant le cours.
+      setError(`${message} [${statusName(code)} ${code}]`);
+      setCanRetry(retryable);
     }
   };
 
@@ -44,7 +52,16 @@ export function SendMessage() {
       />
       <button onClick={send}>Envoyer</button>
       {ack && <p style={{ color: "green" }}>{ack}</p>}
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && (
+        <p style={{ color: "red" }}>
+          {error}{" "}
+          {canRetry && (
+            <button type="button" onClick={send}>
+              Réessayer
+            </button>
+          )}
+        </p>
+      )}
     </div>
   );
 }

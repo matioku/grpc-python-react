@@ -1,4 +1,4 @@
-"""Intercepteur de logging — middleware gRPC (Module 2.6)."""
+"""Intercepteur de logging — middleware gRPC (Module 2.6 + metadata 4.5)."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ from collections.abc import Callable, Iterator
 from typing import Any
 
 import grpc
+
+from .handlers import metadata_dict, rebuild_handler
 
 
 class LoggingInterceptor(grpc.ServerInterceptor):
@@ -18,13 +20,24 @@ class LoggingInterceptor(grpc.ServerInterceptor):
         if handler is None:
             return None
 
+        # Module 4.5 — les metadata sont les « headers » de l'appel : elles
+        # arrivent AVANT la requête, donc l'intercepteur peut déjà les lire.
+        metadata = metadata_dict(handler_call_details)
+        request_id = metadata.get("x-request-id", "-")
+        # Exercice 2 : le client React s'annonce ici.
+        # (x-user-agent est réservé : grpc-web l'écrase avec sa propre valeur.)
+        client_app = metadata.get("x-client-app", "-")
+
         def wrap(behavior: Callable[..., Any]) -> Callable[..., Any]:
             def new_behavior(request_or_iterator, context):
                 start = time.time()
 
                 def _log() -> None:
                     elapsed_ms = (time.time() - start) * 1000
-                    print(f"📥 {method} — {elapsed_ms:.0f} ms")
+                    print(
+                        f"📥 {method} — {elapsed_ms:.0f} ms "
+                        f"[client={client_app} req-id={request_id}]"
+                    )
 
                 try:
                     result = behavior(request_or_iterator, context)
