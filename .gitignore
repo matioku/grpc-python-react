@@ -9,7 +9,13 @@ wheels/
 # Virtual environments
 .venv
 
-# Stubs
+# Stubs User (Module 1) — générés dans protos/
 protos/*_pb2.py
 protos/*_pb2.pyi
 protos/*_pb2_grpc.py
+
+# Stubs Chat (Module 2) — générés dans generated/
+generated/*_pb2.py
+generated/*_pb2.pyi
+generated/*_pb2_grpc.py
+!generated/__init__.py

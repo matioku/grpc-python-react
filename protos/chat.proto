@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package chat.v1;
+
+// ---------- Messages ----------
+
+message ChatMessage {
+  string user = 1;
+  string text = 2;
+  string timestamp = 3;  // ISO 8601, format string pour rester simple
+  int32 id = 4;          // Identifiant attribué par le serveur (DeleteMessage)
+}
+
+message SubscribeRequest {
+  string user = 1;
+  repeated ChatMessage messages = 2;  // "repeated" = liste (0 à N éléments)
+}
+
+message UploadSummary {
+  int32 count = 1;  // Nombre total de messages concernés
+}
+
+// Exercice 2 : requête dédiée pour l'historique avec limite
+message HistoryRequest {
+  int32 limit = 1;   // N derniers messages (0 = tous)
+  string user = 2;   // Filtrer par utilisateur
+}
+
+// Exercice 1 : identifiant pour supprimer un message
+message MessageId {
+  int32 id = 1;
+}
+
+// ---------- Service : les 4 types d'appels + exercices ----------
+
+service ChatService {
+  // UNARY : envoyer un message et recevoir un accusé
+  rpc SendMessage (ChatMessage) returns (ChatMessage);
+
+  // SERVER STREAMING : historique des messages d'un utilisateur
+  rpc History (HistoryRequest) returns (stream ChatMessage);
+
+  // CLIENT STREAMING : envoyer un lot de messages, recevoir un résumé
+  rpc UploadBatch (stream SubscribeRequest) returns (UploadSummary);
+
+  // BIDIRECTIONNEL : chat en temps réel
+  rpc Chat (stream ChatMessage) returns (stream ChatMessage);
+
+  // Exercice 1 : supprimer un message
+  rpc DeleteMessage (MessageId) returns (UploadSummary);
+}
