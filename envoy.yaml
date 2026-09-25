@@ -1,21 +1,17 @@
-# Proxy Envoy (Module 3.4) — traduit grpc-web (navigateur) → gRPC natif (Python)
+# Proxy Envoy (Modules 3 + 5) — grpc-web → gRPC + mTLS vers Python
 #
-#   React :5173 ──HTTP/1.1 grpc-web──▶ Envoy :8080 ──HTTP/2 gRPC──▶ main.py :50051
-#
-# Lancement :
-#   docker run --rm -it -v "$(pwd)/envoy.yaml:/etc/envoy/envoy.yaml:ro" \
-#     -p 8080:8080 -p 9901:9901 envoyproxy/envoy:v1.39-latest
+# Dev (hôte) : cluster → host.docker.internal:50052 avec certs montés
+# Compose   : cluster → chat-server:50052 (hostname du service backend)
 
 admin:
   address:
-    socket_address: { address: 0.0.0.0, port_value: 9901 }   # console d'admin (http://localhost:9901)
+    socket_address: { address: 0.0.0.0, port_value: 9901 }
 
 static_resources:
   listeners:
-  # ---------- 1. LISTENER : là où React envoie ses requêtes grpc-web ----------
   - name: listener_0
     address:
-      socket_address: { address: 0.0.0.0, port_value: 8080 }  # ← le front appelle ce port
+      socket_address: { address: 0.0.0.0, port_value: 8080 }
     filter_chains:
     - filters:
       - name: envoy.filters.network.http_connection_manager
@@ -29,54 +25,68 @@ static_resources:
             - name: local_service
               domains: ["*"]
               routes:
-              - match: { prefix: "/" }                          # toutes les requêtes…
+              - match: { prefix: "/" }
                 route:
-                  cluster: chat_service                          # … envoyées au cluster Python
-                  timeout: 0s                                    # pas de timeout (sinon 15 s coupent les streams)
+                  cluster: chat_service
+                  timeout: 0s
                   max_stream_duration: { grpc_timeout_header_max: 0s }
-              # CORS : le front (localhost:5173) et Envoy (localhost:8080) n'ont pas
-              # la même origine → le navigateur envoie un preflight OPTIONS.
               typed_per_filter_config:
                 envoy.filters.http.cors:
                   "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
                   allow_origin_string_match:
                   - prefix: "*"
                   allow_methods: GET, PUT, DELETE, POST, OPTIONS
-                  # Module 4.5 : les metadata voyagent en headers HTTP — toute
-                  # clé custom doit être autorisée ici, sinon le preflight CORS
-                  # bloque l'appel (authorization, x-request-id, x-client-app).
                   allow_headers: keep-alive,user-agent,cache-control,content-type,content-transfer-encoding,x-accept-content-transfer-encoding,x-accept-response-streaming,x-user-agent,x-grpc-web,grpc-timeout,authorization,x-request-id,x-client-app
-                  expose_headers: grpc-status,grpc-message,x-request-id  # lisibles par le front
+                  expose_headers: grpc-status,grpc-message,x-request-id
                   max_age: "1728000"
-          # ---------- 2. HTTP_FILTERS : la traduction ----------
           http_filters:
-          - name: envoy.filters.http.grpc_web                  # ← LE filtre traducteur grpc-web ⇄ gRPC
+          - name: envoy.filters.http.grpc_web
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_web.v3.GrpcWeb
           - name: envoy.filters.http.cors
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
-          - name: envoy.filters.http.router                    # toujours en dernier
+          - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
-  # ---------- 3. CLUSTER : la destination = le serveur Python (main.py) ----------
   clusters:
   - name: chat_service
-    type: LOGICAL_DNS                    # un nom d'hôte (pas une IP) → résolution DNS
+    type: LOGICAL_DNS
     dns_lookup_family: V4_ONLY
-    connect_timeout: 0.25s
+    connect_timeout: 5s
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
-          http2_protocol_options: {}     # le backend parle HTTP/2 (gRPC natif)
+          http2_protocol_options: {}
+    # Health check gRPC standard (5.4)
+    health_checks:
+    - timeout: 1s
+      interval: 5s
+      healthy_threshold: 2
+      unhealthy_threshold: 3
+      grpc_health_check: {}
+    # mTLS vers Python (5.2)
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain: { filename: "/etc/envoy/certs/client.crt" }
+            private_key: { filename: "/etc/envoy/certs/client.key" }
+          validation_context:
+            trusted_ca: { filename: "/etc/envoy/certs/ca.crt" }
+            match_typed_subject_alt_names:
+            - san_type: DNS
+              matcher: { exact: "chat-server" }
+        sni: chat-server
     load_assignment:
       cluster_name: chat_service
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
-              # host.docker.internal = la machine hôte vue depuis le conteneur (Mac/Windows).
-              # Linux : ajouter --add-host=host.docker.internal:host-gateway au docker run.
-              socket_address: { address: host.docker.internal, port_value: 50051 }
+              # Surchargé en compose via envoy.compose.yaml, ou host.docker.internal en dev.
+              socket_address: { address: chat-server, port_value: 50052 }

@@ -5,7 +5,7 @@ import { client, statusName } from "../grpc/client"; // le stub du 3.5
 import { grpcErrorMessage } from "../grpc/errors";
 import { callMetadata } from "../grpc/metadata";
 
-export function SendMessage() {
+export function SendMessage({ defaultUser = "Mounir" }: { defaultUser?: string }) {
   const [text, setText] = useState("");
   const [ack, setAck] = useState("");
   const [error, setError] = useState("");
@@ -19,7 +19,7 @@ export function SendMessage() {
     //    Pas de vérification côté client : un texte vide part au serveur,
     //    qui répond INVALID_ARGUMENT (exercice 3).
     const request = new ChatMessage()
-      .setUser("Mounir")
+      .setUser(defaultUser)
       .setText(text)
       .setTimestamp(new Date().toISOString());
 

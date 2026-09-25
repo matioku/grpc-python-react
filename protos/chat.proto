@@ -31,9 +31,23 @@ message MessageId {
   int32 id = 1;
 }
 
+// Module 5.3 / exercice 3 : authentification applicative
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  string token = 1;  // JWT HS256
+  string user = 2;   // sujet (= username)
+}
+
 // ---------- Service : les 4 types d'appels + exercices ----------
 
 service ChatService {
+  // UNARY (Module 5) : délivre un JWT — PUBLIC (pas d'auth sur cet RPC)
+  rpc Login (LoginRequest) returns (LoginResponse);
+
   // UNARY : envoyer un message et recevoir un accusé
   rpc SendMessage (ChatMessage) returns (ChatMessage);
 

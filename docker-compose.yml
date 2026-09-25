@@ -1,0 +1,40 @@
+services:
+  backend:
+    build: .
+    hostname: chat-server
+    ports:
+      - "50052:50052"
+    volumes:
+      - ./certs:/app/certs:ro
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-prod-please-use-32b+}
+      GRPC_TLS: "1"
+      GRPC_PORT: "50052"
+      CERTS_DIR: /app/certs
+
+  envoy:
+    image: envoyproxy/envoy:v1.30-latest
+    ports:
+      - "8080:8080"
+      - "9901:9901"
+    volumes:
+      - ./envoy.yaml:/etc/envoy/envoy.yaml:ro
+      - ./certs:/etc/envoy/certs:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    command: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "info"]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_GRPC_URL: /api
+    ports:
+      - "8443:443"
+    volumes:
+      - ./certs/nginx.crt:/etc/nginx/certs/nginx.crt:ro
+      - ./certs/nginx.key:/etc/nginx/certs/nginx.key:ro
+    depends_on:
+      - envoy

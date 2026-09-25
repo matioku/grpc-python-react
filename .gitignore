@@ -23,3 +23,9 @@ generated/*_pb2_grpc.py
 # Stubs grpc-web (Module 3) — générés dans frontend/src/generated/ (npm run proto)
 frontend/src/generated/*
 !frontend/src/generated/package.json
+
+# Certificats (Module 5) — générés localement, jamais commités
+certs/*.key
+certs/*.crt
+certs/*.csr
+!certs/.gitkeep

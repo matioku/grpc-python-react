@@ -1,0 +1,7 @@
+# Ignore les secrets et caches — le contexte de build reste la racine
+.venv
+**/__pycache__
+.git
+*.md
+frontend/node_modules
+frontend/dist

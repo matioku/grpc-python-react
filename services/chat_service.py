@@ -9,6 +9,7 @@ from itertools import count
 import grpc
 
 from generated import chat_pb2, chat_pb2_grpc
+from auth.jwt_utils import DEMO_USERS, issue_token
 
 # ---- État partagé du serveur (en mémoire pour le cours) ----
 MESSAGES: list[chat_pb2.ChatMessage] = []
@@ -35,6 +36,19 @@ def _broadcast(msg: chat_pb2.ChatMessage) -> None:
 
 
 class ChatService(chat_pb2_grpc.ChatServiceServicer):
+    # ================= 0. LOGIN (Module 5 / exercice 3) =================
+    def Login(self, request, context):
+        """Unary public : délivre un JWT si les identifiants sont valides."""
+        username = request.username.strip().lower()
+        password = request.password
+        if not username or DEMO_USERS.get(username) != password:
+            context.abort(
+                grpc.StatusCode.UNAUTHENTICATED,
+                "Identifiants invalides",
+            )
+        token = issue_token(username)
+        return chat_pb2.LoginResponse(token=token, user=username)
+
     # ================= 1. UNARY =================
     def SendMessage(self, request, context):
         """1 requête → 1 réponse. Validation via status codes (2.5)."""

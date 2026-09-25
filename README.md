@@ -1,4 +1,4 @@
-# gRPC Python + React — Modules 2, 3 & 4
+# gRPC Python + React — Modules 2 → 5
 
 ## Initialisation
 
@@ -205,3 +205,56 @@ VITE_GRPC_TOKEN=secret-token npm run dev                     # terminal 3
 | flux tronqué en silence (`break`) quand le temps manque | `context.abort(DEADLINE_EXCEEDED, …)` | sinon le client reçoit un `OK` avec des données partielles |
 
 > Le PDF numérote ce module « 4 » (le Module 3 étant le frontend React déjà présent dans ce repo).
+
+## Mise en production (Module 5)
+
+Architecture cible :
+
+```
+Navigateur ──HTTPS──▶ Nginx :8443 (React)
+                         │ /api
+                         ▼
+                      Envoy :8080 (grpc-web → gRPC + mTLS)
+                         │
+                         ▼
+                   Python :50052 (TLS + mTLS + JWT + health)
+```
+
+### Certificats
+
+```bash
+bash scripts/generate-certs.sh
+```
+
+### Lancer en mode production local (sans Docker front)
+
+```bash
+uv sync
+# régénérer les stubs après modification de chat.proto (Login)
+uv run python main.py                    # TLS+mTLS :50052
+uv run python verify_prod.py             # exercices 1-2 (rejet sans cert, JWT)
+```
+
+Mode insecure (modules 1-4) :
+
+```bash
+GRPC_TLS=0 GRPC_PORT=50051 uv run python main.py
+```
+
+### Docker Compose (chaîne complète)
+
+```bash
+bash scripts/generate-certs.sh
+cd frontend && npm install && npm run proto && cd ..
+docker compose up --build
+# → https://localhost:8443  (cert auto-signé : accepter l'avertissement)
+# → Envoy http://localhost:8080  |  admin :9901
+```
+
+Comptes démo : `mounir` / `alice` / `bob` — mot de passe `password`.
+
+### Exercices Module 5
+
+1. mTLS : `verify_prod.py` confirme qu'un appel sans cert client est rejeté.
+2. Intercepteur JWT automatique (sauf Health + Login) — déjà en place.
+3. RPC `Login` + écran React + Bearer dans les metadata — déjà en place.
